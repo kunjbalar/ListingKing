@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "ListingKing for Meesho",
+  "version": "0.1.36",
+  "description": "Capture approved Meesho templates and fill one reviewed catalog item at a time.",
+  "permissions": ["storage", "debugger"],
+  "host_permissions": ["https://supplier.meesho.com/*", "https://supplier.meesho.in/*", "https://*.listingking.app/*", "http://localhost:3000/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "ListingKing", "default_popup": "popup.html" },
+  "content_scripts": [{
+    "matches": ["https://supplier.meesho.com/*", "https://supplier.meesho.in/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}

@@ -1,0 +1,185 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum Platform { 
+  MEESHO 
+}
+enum TemplateStatus { 
+  ACTIVE 
+  NEEDS_REMAPPING 
+  ARCHIVED 
+}
+enum SmartListingStatus { 
+  DRAFT 
+  READY 
+  PARTIALLY_FILLED 
+  COMPLETED 
+  NEEDS_REMAPPING 
+  ERROR 
+  ARCHIVED 
+}
+enum ItemStatus { 
+  DRAFT 
+  READY 
+  FILLING 
+  FILLED 
+  ERROR 
+}
+enum ImageRole { 
+  FRONT 
+  SIDE 
+  DETAIL 
+  BACK 
+}
+enum FillJobStatus { 
+  STARTED 
+  SUCCESS 
+  PARTIAL 
+  FAILED 
+  DRY_RUN 
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  templates Template[]
+  smartListings SmartListing[]
+  aiGenerations AiGeneration[]
+  fillJobs FillJob[]
+  auditLogs AuditLog[]
+}
+
+model Template {
+  id String @id @default(cuid())
+  userId String
+  platform Platform @default(MEESHO)
+  name String
+  categoryLabel String
+  status TemplateStatus @default(ACTIVE)
+  version Int @default(1)
+  schemaJson Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastValidatedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields TemplateField[]
+  smartListings SmartListing[]
+  @@index([userId, platform, status])
+}
+
+model TemplateField {
+  id String @id @default(cuid())
+  templateId String
+  fieldKey String
+  label String
+  inputType String
+  required Boolean @default(false)
+  selectorCandidatesJson Json
+  mappingJson Json
+  defaultValueJson Json?
+  position Int
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  @@unique([templateId, fieldKey])
+}
+
+model SmartListing {
+  id String @id @default(cuid())
+  userId String
+  templateId String
+  name String
+  status SmartListingStatus @default(DRAFT)
+  productDetailsJson Json
+  listingCount Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template Template @relation(fields: [templateId], references: [id])
+  items SmartListingItem[]
+  @@index([userId, status, updatedAt])
+}
+
+model SmartListingItem {
+  id String @id @default(cuid())
+  smartListingId String
+  position Int
+  title String?
+  description String?
+  mrp Decimal? @db.Decimal(10,2)
+  meeshoPrice Decimal? @db.Decimal(10,2)
+  defectivePrice Decimal? @db.Decimal(10,2)
+  sku String?
+  status ItemStatus @default(DRAFT)
+  validationJson Json?
+  smartListing SmartListing @relation(fields: [smartListingId], references: [id], onDelete: Cascade)
+  images ListingImage[]
+  aiGenerations AiGeneration[]
+  fillJobs FillJob[]
+  @@unique([smartListingId, position])
+  @@index([sku])
+}
+
+model ListingImage {
+  id String @id @default(cuid())
+  smartListingItemId String
+  role ImageRole
+  storageKey String
+  checksum String
+  width Int
+  height Int
+  sortOrder Int @default(0)
+  item SmartListingItem @relation(fields: [smartListingItemId], references: [id], onDelete: Cascade)
+  @@index([smartListingItemId, role])
+  @@index([checksum])
+}
+
+model AiGeneration {
+  id String @id @default(cuid())
+  userId String
+  smartListingItemId String
+  provider String
+  model String
+  promptVersion String
+  inputHash String
+  outputJson Json
+  warningsJson Json
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item SmartListingItem @relation(fields: [smartListingItemId], references: [id], onDelete: Cascade)
+  @@index([userId, inputHash])
+}
+
+model FillJob {
+  id String @id @default(cuid())
+  userId String
+  smartListingItemId String
+  templateVersion Int
+  status FillJobStatus
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  resultsJson Json?
+  errorJson Json?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item SmartListingItem @relation(fields: [smartListingItemId], references: [id], onDelete: Cascade)
+  @@index([userId, status])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  userId String
+  action String
+  entityType String
+  entityId String
+  metadataJson Json?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}

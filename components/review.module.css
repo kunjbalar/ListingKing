@@ -1,0 +1,42 @@
+.items article {
+  align-items: start;
+}
+
+.content {
+  min-width: 0;
+}
+
+.content p {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.55;
+  margin: 7px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.content dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.content dl div {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 7px;
+  background: #fafbf8;
+}
+
+.content dt {
+  font-size: 9px;
+  color: #929b97;
+}
+
+.content dd {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+}
