@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const item = await prisma.smartListingItem.create({ data: {
           smartListingId: listing.id,
           position,
-          sku: generateProductSku(details.productName, listing.id, crypto.randomUUID(), position),
+          sku: generateProductSku(details.productName, details.skuCode, listing.id, crypto.randomUUID(), position),
           status: "DRAFT",
         } });
         createdItemIds.push(item.id);

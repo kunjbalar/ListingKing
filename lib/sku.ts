@@ -12,15 +12,17 @@ function skuWords(value: string) {
 }
 
 /**
- * A seller-facing SKU that identifies the product, while the hash keeps it
- * unique even when two listings have the same title.
+ * A seller-facing SKU that identifies the product, while the random suffix
+ * keeps it unique even when two listings have the same title.
+ *
+ * Format: PRODUCTNAME-skuCode-XXXXX (5 random digits)
  */
-export function generateProductSku(productTitle: string, listingKey: string, itemKey: string, position: number) {
-  const words = skuWords(productTitle);
-  const first = (words[0] || "PRODUCT").slice(0, 8);
-  const second = (words[1] || words[0] || "ITEM").slice(0, 8);
-  const unique = crypto.createHash("sha256").update(`${listingKey}:${itemKey}:${position}`).digest("hex").slice(0, 4).toUpperCase();
-  return `${first}-${second}-${String(position).padStart(3, "0")}-${unique}`;
+export function generateProductSku(productTitle: string, skuCode: number, listingKey: string, itemKey: string, position: number) {
+  const clean = productTitle.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) || "PRODUCT";
+  const hash = crypto.createHash("sha256").update(`${listingKey}:${itemKey}:${position}`).digest("hex");
+  const random = parseInt(hash.slice(0, 8), 16) % 100000;
+  return `${clean}-${skuCode}-${String(random).padStart(5, "0")}`;
 }
 
-export const productSkuPattern = /^[A-Z0-9]{2,8}-[A-Z0-9]{2,8}-\d{3}-[A-F0-9]{4}$/;
+export const productSkuPattern = /^[A-Z0-9]{2,15}-\d{1,5}-\d{5}$/;
+

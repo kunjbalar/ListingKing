@@ -4,12 +4,12 @@ import { ChangeEvent, Dispatch, SetStateAction, useEffect, useRef, useState } fr
 import { signOut } from "next-auth/react";
 import reviewStyles from "./review.module.css";
 
-type Details = { productName: string; category: string; material: string; color: string; style: string; features: string; audience: string; keywords: string; notes: string };
+type Details = { productName: string; category: string; material: string; color: string; style: string; features: string; audience: string; keywords: string; notes: string; skuCode: string };
 type SavedTemplate = { id: string; name: string; categoryLabel: string; version: number };
 type ImageRole = "front" | "side" | "detail" | "back";
 type SelectedImage = { id: string; file: File; url: string; uploading?: boolean; stored?: boolean; databaseId?: string };
 
-const initial: Details = { productName: "", category: "", material: "", color: "", style: "", features: "", audience: "", keywords: "", notes: "" };
+const initial: Details = { productName: "", category: "", material: "", color: "", style: "", features: "", audience: "", keywords: "", notes: "", skuCode: "" };
 const stages = ["Set up", "Images", "Content & prices", "SKU IDs", "Review"];
 
 /**
@@ -47,10 +47,10 @@ export function Dashboard() {
   const [ready, setReady] = useState(false);
 
   const selectedTemplate = templates.find(template => template.id === templateId);
-  const setupComplete = Boolean(templateId) && details.productName.trim().length >= 2 && details.features.trim().length >= 3;
+  const setupComplete = Boolean(templateId) && details.productName.trim().length >= 2 && details.features.trim().length >= 3 && /^\d+$/.test(details.skuCode.trim()) && Number(details.skuCode) >= 1;
   const setupRequirement = !templateId
     ? "Choose a saved Meesho template before continuing."
-    : "Complete the required Product name and Key features fields (marked *).";
+    : "Complete the required Product name, Key features, and SKU Code fields (marked *).";
   const storedFrontImageCount = images.front.filter(image => image.stored).length;
   const imageStepComplete = storedFrontImageCount >= count;
   const imageRequirement = `Upload and store ${Math.max(0, count - storedFrontImageCount)} more front image${count - storedFrontImageCount === 1 ? "" : "s"} to continue.`;
@@ -181,6 +181,7 @@ function Setup({ count, setCount, templates, templateId, setTemplateId, loading,
       <button type="button" className="template create" onClick={() => void reload()}><b>↻</b><span><strong>Refresh templates</strong><small>Load newly captured Meesho templates</small></span></button>
     </div>
     <h3>How many catalog items?</h3><div className="count-row">{[5, 10, 25, 50].map(value => <button key={value} className={count === value ? "count selected" : "count"} onClick={() => setCount(value)}>{value}</button>)}<label className="custom-count">Custom <input type="number" min="1" max="50" value={count} onChange={event => setCount(Math.max(1, Math.min(50, Number(event.target.value) || 1)))} /></label></div>
+    <h3>SKU Code <span className="field-required" aria-label="required"> *</span></h3><p style={{margin: "-6px 0 8px", fontSize: "11px", color: "#6a767b"}}>Enter a unique integer code for this product (e.g. 4789). This will appear in every generated SKU ID.</p><div className="count-row"><label className="custom-count" style={{paddingLeft: "12px"}}><input type="number" min="1" max="99999" placeholder="e.g. 4789" value={details.skuCode} onChange={event => update("skuCode", event.target.value)} style={{width: "120px"}} /></label></div>
     <div className="form-grid">{labels.map(([key, label]) => {
       const required = key === "productName" || key === "features";
       return <label key={key} className={key === "features" || key === "notes" ? "wide" : ""}>{label}{required && <span className="field-required" aria-label="required"> *</span>}<input value={details[key]} onChange={event => update(key, event.target.value)} placeholder={label} maxLength={key === "productName" ? 80 : undefined} required={required} aria-required={required} /></label>;
@@ -333,6 +334,9 @@ function Content({ listingId, onError }: { listingId: string; onError: (message:
 function Skus({ listingId, onError }: { listingId: string; onError: (message: string) => void }) {
   const [items, setItems] = useState<{ id: string; position: number; sku: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
     if (!listingId) return;
     const load = async () => {
@@ -353,8 +357,35 @@ function Skus({ listingId, onError }: { listingId: string; onError: (message: st
     };
     void load();
   }, [listingId, onError]);
+
+  const startEdit = (item: { id: string; sku: string | null }) => {
+    setEditingId(item.id);
+    setEditValue(item.sku || "");
+  };
+  const cancelEdit = () => { setEditingId(null); setEditValue(""); };
+  const saveEdit = async (itemId: string) => {
+    if (!editValue.trim()) { onError("SKU cannot be empty."); return; }
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/smart-listings/${listingId}/skus`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, sku: editValue.trim() }),
+      });
+      const body = await readApiJson<{ message?: string }>(response);
+      if (!response.ok || !body) throw new Error(apiMessage(response, body, "SKU could not be updated."));
+      setItems(current => current.map(item => item.id === itemId ? { ...item, sku: editValue.trim() } : item));
+      setEditingId(null);
+      setEditValue("");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "SKU could not be updated.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <p className="template-empty">Loading the saved SKU IDs…</p>;
-  return <><div className="section-title"><div><p className="eyebrow">STEP 04</p><h2>Every item receives a unique SKU</h2><p>These exact stored IDs are used again on Review and by the ListingKing extension.</p></div></div><div className="sku-list">{items.map(item => <label key={item.id}><span>{String(item.position).padStart(2, "0")}</span><input value={item.sku || "SKU pending"} readOnly /><em>Available</em></label>)}</div></>;
+  return <><div className="section-title"><div><p className="eyebrow">STEP 04</p><h2>Every item receives a unique SKU</h2><p>These exact stored IDs are used again on Review and by the ListingKing extension.</p></div></div><div className="sku-list">{items.map(item => <label key={item.id}><span>{String(item.position).padStart(2, "0")}</span>{editingId === item.id ? <input value={editValue} onChange={event => setEditValue(event.target.value)} autoFocus /> : <input value={item.sku || "SKU pending"} readOnly />}{editingId === item.id ? <span style={{display: "flex", gap: "6px"}}><button className="primary" style={{padding: "4px 10px", fontSize: "11px"}} onClick={() => void saveEdit(item.id)} disabled={saving}>{saving ? "…" : "Save"}</button><button className="secondary" style={{padding: "4px 8px", fontSize: "11px"}} onClick={cancelEdit} disabled={saving}>✕</button></span> : <span style={{display: "flex", gap: "8px", alignItems: "center"}}><button className="secondary" style={{padding: "4px 10px", fontSize: "11px"}} onClick={() => startEdit(item)}>Edit</button><em>Available</em></span>}</label>)}</div></>;
 }
 function Review({ listingId, count, template, onError }: { listingId: string; count: number; template: string; onError: (message: string) => void }) {
   const [items, setItems] = useState<ListingContentItem[]>([]);

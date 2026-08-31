@@ -48,7 +48,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       await prisma.smartListingItem.update({ where: { id: item.id }, data: {
         title: result.title,
         description: result.description,
-        sku: generateProductSku(result.title, listing.id, item.id, item.position),
+        sku: generateProductSku(result.title, input.skuCode, listing.id, item.id, item.position),
       } });
       await prisma.aiGeneration.create({ data: {
         userId: user.id,

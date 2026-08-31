@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { currentUser } from "@/lib/current-user";
+import { productDetailsSchema } from "@/lib/contracts";
 import { prisma } from "@/lib/prisma";
 import { generateProductSku } from "@/lib/sku";
 
@@ -33,8 +34,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
     const data = z.object({ items: z.array(itemSchema).min(1) }).safeParse(await request.json().catch(() => null));
     if (!data.success) return Response.json({ code: "VALIDATION_ERROR", message: "Every title, description, MRP, Meesho price, and inventory value is required. Wrong / defective return price is optional.", fieldErrors: data.error.flatten() }, { status: 400 });
-    const listing = await prisma.smartListing.findFirst({ where: { id, userId: user.id }, select: { id: true } });
+    const listing = await prisma.smartListing.findFirst({ where: { id, userId: user.id }, select: { id: true, productDetailsJson: true } });
     if (!listing) return Response.json({ code: "NOT_FOUND", message: "Smart Listing not found." }, { status: 404 });
+    const details = productDetailsSchema.parse(listing.productDetailsJson);
     const itemIds = data.data.items.map(item => item.id);
     const ownedItems = await prisma.smartListingItem.findMany({ where: { smartListingId: id, id: { in: itemIds } }, select: { id: true, position: true } });
     if (ownedItems.length !== itemIds.length) return Response.json({ code: "FORBIDDEN", message: "One or more listing items do not belong to this draft." }, { status: 403 });
@@ -50,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         meeshoPrice: item.meeshoPrice,
         defectivePrice: item.defectivePrice ?? null,
         validationJson: { inventory: item.inventory },
-        sku: generateProductSku(item.title, id, item.id, positionById.get(item.id)!),
+        sku: generateProductSku(item.title, details.skuCode, id, item.id, positionById.get(item.id)!),
       } });
     }
     return Response.json({ ok: true });

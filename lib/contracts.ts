@@ -9,7 +9,8 @@ export const productDetailsSchema = z.object({
   features: z.string().trim().min(3).max(800),
   audience: z.string().trim().max(80).default(""),
   keywords: z.string().trim().max(300).default(""),
-  notes: z.string().trim().max(500).default("")
+  notes: z.string().trim().max(500).default(""),
+  skuCode: z.coerce.number().int().min(1).max(99999)
 });
 
 const optionalPositiveNumber = z.preprocess(value => value === "" || value === null || value === undefined ? undefined : value, z.coerce.number().positive().optional());

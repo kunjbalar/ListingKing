@@ -11,7 +11,8 @@ const product: ProductDetails = {
   features: "light texture and seller-provided product details",
   audience: "adult customers",
   keywords: "",
-  notes: ""
+  notes: "",
+  skuCode: 1234
 };
 
 describe("marketplace-safe description generation", () => {
