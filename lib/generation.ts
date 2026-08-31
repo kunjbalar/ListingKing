@@ -85,7 +85,7 @@ export function normaliseMarketplaceDescription(raw: unknown, input: ProductDeta
   return /[.!?]$/.test(paragraph) ? paragraph : `${paragraph}.`;
 }
 
-function parseGeneratedContent(text: string, input: ProductDetails, itemCount: number): GeneratedContent {
+function parseGeneratedContent(text: string, input: ProductDetails, expectedCount?: number): GeneratedContent {
   const source = text.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
   let parsed: unknown;
   try { parsed = JSON.parse(source); } catch { throw new ContentGenerationError("The AI response was not valid JSON. Please try generating again."); }
@@ -93,27 +93,26 @@ function parseGeneratedContent(text: string, input: ProductDetails, itemCount: n
     throw new ContentGenerationError("The AI response did not contain listing items. Please try generating again.");
   }
   const rawItems = (parsed as { items: unknown[] }).items;
-  if (rawItems.length !== itemCount) throw new ContentGenerationError(`The AI returned ${rawItems.length} items instead of ${itemCount}. Please try generating again.`);
-  const usedTitles = new Set<string>();
-  const items = rawItems.map((raw, index) => {
-    const value = raw && typeof raw === "object" ? raw as { title?: unknown; description?: unknown } : {};
-    return { title: normaliseTitle(value.title, input.productName, index, usedTitles), description: normaliseMarketplaceDescription(value.description, input) };
-  });
   const warnings = Array.isArray((parsed as { warnings?: unknown }).warnings)
     ? (parsed as { warnings: unknown[] }).warnings.filter((warning): warning is string => typeof warning === "string").slice(0, 5)
     : [];
+  const usedTitles = new Set<string>();
+  const items = (expectedCount ? rawItems.slice(0, expectedCount) : rawItems).map((raw, index) => {
+    const value = raw && typeof raw === "object" ? raw as { title?: unknown; description?: unknown } : {};
+    return { title: normaliseTitle(value.title, input.productName, index, usedTitles), description: normaliseMarketplaceDescription(value.description, input) };
+  });
   return { items, warnings };
 }
 
 function contentPrompt(input: ProductDetails, itemCount: number) {
-  return `Generate content for exactly ${itemCount} separate Meesho catalog listings. Return JSON only in this exact form: {"items":[{"title":"...","description":"..."}],"warnings":[]}.
+  return `Generate content for exactly ${itemCount} separate Meesho catalog listings. You MUST return exactly ${itemCount} items — not ${itemCount - 1}, not ${itemCount + 1}. Count each item as you generate it (item 1, item 2, ... item ${itemCount}). Return JSON only in this exact form: {"items":[{"title":"...","description":"..."}],"warnings":[]}.
 
 Seller product name (must be preserved verbatim in every title): ${input.productName}
 Seller key features (the source of product claims): ${input.features}
 Optional seller context: ${JSON.stringify({ category: input.category, material: input.material, color: input.color, style: input.style, audience: input.audience, keywords: input.keywords, notes: input.notes })}
 
 Title requirements:
-- Return exactly ${itemCount} titles, one for each item.
+- Return exactly ${itemCount} titles, one for each item (item 1 through item ${itemCount}).
 - Every title must contain the exact seller product name "${input.productName}" unchanged; it is the core of the title.
 - Each title must be unique, search-friendly, and 50–80 characters where the product name length allows it; never exceed 100 characters.
 - Vary genuine search angles such as use case, audience, form, or seller-provided attributes. Do not add an unverified brand, certification, medical promise, offer, measurement, material, or performance claim.
@@ -145,11 +144,14 @@ async function readError(response: Response, fallback: string) {
   return body?.error?.message || body?.message || fallback;
 }
 
-export const groqContentProvider: ContentProvider = {
-  async generate(input, itemCount) {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new ContentGenerationError("Groq is not configured.");
-    const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+const GROQ_BATCH_SIZE = 10;
+const GROQ_BATCH_DELAY_MS = 6_000; // 6-second pause between batches to stay within free-tier TPM
+const GROQ_RATE_LIMIT_RETRIES = 3;
+
+function sleep(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function groqSingleBatch(apiKey: string, model: string, input: ProductDetails, batchSize: number): Promise<GeneratedContent> {
+  for (let attempt = 0; attempt < GROQ_RATE_LIMIT_RETRIES; attempt++) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -157,21 +159,66 @@ export const groqContentProvider: ContentProvider = {
         model,
         messages: [
           { role: "system", content: "You create accurate marketplace copy. Follow the seller facts exactly and output only the requested JSON." },
-          { role: "user", content: contentPrompt(input, itemCount) }
+          { role: "user", content: contentPrompt(input, batchSize) }
         ],
         response_format: { type: "json_object" },
         reasoning_effort: "low",
         reasoning_format: "hidden",
-        max_completion_tokens: Math.min(12000, Math.max(1000, itemCount * 180)),
+        max_completion_tokens: Math.min(32000, Math.max(2000, batchSize * 350)),
         temperature: 0.7,
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(90_000),
     });
+
+    // Handle rate limit: wait and retry
+    if (response.status === 429) {
+      const retryAfter = parseFloat(response.headers.get("retry-after") || "8");
+      const waitMs = Math.ceil((isNaN(retryAfter) ? 8 : retryAfter) * 1000) + 1000;
+      await response.text(); // drain body
+      if (attempt < GROQ_RATE_LIMIT_RETRIES - 1) { await sleep(waitMs); continue; }
+      throw new ContentGenerationError("Groq rate limit exceeded. Please wait a minute and try again.", 429);
+    }
+
     if (!response.ok) throw new ContentGenerationError(await readError(response, `Groq generation failed (${response.status}).`), response.status);
     const body = await response.json();
     const text = body.choices?.[0]?.message?.content;
     if (typeof text !== "string") throw new ContentGenerationError("Groq returned an empty response. Please try generating again.");
-    return parseGeneratedContent(text, input, itemCount);
+    return parseGeneratedContent(text, input, batchSize);
+  }
+  throw new ContentGenerationError("Groq generation failed after multiple retries. Please try again.");
+}
+
+export const groqContentProvider: ContentProvider = {
+  async generate(input, itemCount) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new ContentGenerationError("Groq is not configured.");
+    const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+
+    // Split into batches of GROQ_BATCH_SIZE to prevent LLM miscounting
+    const allItems: GeneratedItem[] = [];
+    const allWarnings: string[] = [];
+    let batchIndex = 0;
+
+    while (allItems.length < itemCount) {
+      // Pause between batches to respect Groq free-tier rate limits (8,000 TPM)
+      if (batchIndex > 0) await sleep(GROQ_BATCH_DELAY_MS);
+
+      const remaining = itemCount - allItems.length;
+      const batchSize = Math.min(remaining, GROQ_BATCH_SIZE);
+      const result = await groqSingleBatch(apiKey, model, input, batchSize);
+      allItems.push(...result.items);
+      if (result.warnings.length) allWarnings.push(...result.warnings);
+      batchIndex++;
+    }
+
+    // Deduplicate titles across batches
+    const usedTitles = new Set<string>();
+    const finalItems = allItems.slice(0, itemCount).map((item, index) => ({
+      title: normaliseTitle(item.title, input.productName, index, usedTitles),
+      description: item.description,
+    }));
+
+    return { items: finalItems, warnings: allWarnings };
   }
 };
 
