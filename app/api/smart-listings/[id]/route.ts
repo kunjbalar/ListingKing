@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         meeshoPrice: item.meeshoPrice,
         defectivePrice: item.defectivePrice ?? null,
         validationJson: { inventory: item.inventory },
-        sku: generateProductSku(item.title, details.skuCode, id, item.id, positionById.get(item.id)!),
+        sku: generateProductSku(details.productName, details.skuCode, id, item.id, positionById.get(item.id)!),
       } });
     }
     return Response.json({ ok: true });

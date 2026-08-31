@@ -22,7 +22,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     for (const item of listing.items) {
       await prisma.smartListingItem.update({
         where: { id: item.id },
-        data: { sku: generateProductSku(item.title || details.productName, details.skuCode, listing.id, item.id, item.position) },
+        data: { sku: generateProductSku(details.productName, details.skuCode, listing.id, item.id, item.position) },
       });
     }
     return Response.json({ ok: true });
