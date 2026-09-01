@@ -75,6 +75,11 @@ document.querySelector("#save").onclick = async () => {
     password.value = "";
     status.textContent = "Connected. Your session expires in 1 hour.";
     await loadTemplates();
+    // Auto-reload Meesho supplier tabs so the content script picks up the new session and loads listings
+    try {
+      const tabs = await chrome.tabs.query({ url: ["https://supplier.meesho.com/*", "https://supplier.meesho.in/*"] });
+      for (const tab of tabs) if (tab.id) chrome.tabs.reload(tab.id);
+    } catch { /* Tab reload is best-effort; seller can still reload manually. */ }
   } catch (error) {
     status.textContent = error.message || "Could not connect.";
   }
