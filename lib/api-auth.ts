@@ -7,7 +7,7 @@ const b64 = (input: Buffer | string) => Buffer.from(input).toString("base64url")
 const sign = (input: string) => b64(crypto.createHmac("sha256", process.env.AUTH_SECRET || "development-only-change-me").update(input).digest());
 
 export function createExtensionToken(userId: string) {
-  const payload = b64(JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + 60 * 15, scope: "extension" }));
+  const payload = b64(JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + 60 * 60, scope: "extension" }));
   return `${payload}.${sign(payload)}`;
 }
 

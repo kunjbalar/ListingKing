@@ -73,7 +73,7 @@ document.querySelector("#save").onclick = async () => {
     await chrome.storage.local.set({ apiBase, accessToken: data.accessToken, tokenExpiresAt });
     try { await chrome.storage.session.set({ accessToken: data.accessToken, tokenExpiresAt }); } catch { /* Local storage remains the 15-minute token source. */ }
     password.value = "";
-    status.textContent = "Connected. Your session expires in 15 minutes.";
+    status.textContent = "Connected. Your session expires in 1 hour.";
     await loadTemplates();
   } catch (error) {
     status.textContent = error.message || "Could not connect.";
