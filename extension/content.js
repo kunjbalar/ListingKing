@@ -766,7 +766,74 @@
 
   const panel = document.createElement("section");
   panel.id = "listingking-panel";
-  panel.innerHTML = `<style>#listingking-panel{position:fixed;right:20px;bottom:22px;z-index:2147483647;width:322px;background:#122029;color:#fff;border-radius:12px;box-shadow:0 16px 50px #0005;padding:15px;font:12px Arial,sans-serif}#listingking-panel header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:14px;font-weight:700}#listingking-panel .mark{color:#d8f24f}#listingking-panel button{border:0;border-radius:6px;padding:9px 7px;font-weight:700;cursor:pointer;margin:3px;width:calc(50% - 8px)}#listingking-panel .fill{width:calc(100% - 6px);background:#d8f24f;color:#122029;margin-top:9px}#listingking-panel .plain{background:#243941;color:#fff}#listingking-panel .stop{width:calc(100% - 6px);background:#f17b58;color:#fff}#listingking-panel .lk-status{display:block;background:#fff;color:#34745b;border-radius:5px;padding:8px;margin-top:8px;line-height:1.35}#listingking-panel .lk-smart{background:#1b3038;border:1px solid #38515a;border-radius:8px;padding:10px}#listingking-panel .lk-smart strong,#listingking-panel .lk-smart small{display:block}#listingking-panel .lk-smart small{color:#b7c5c8;margin-top:3px;line-height:1.3}#listingking-panel .lk-smart select{width:100%;box-sizing:border-box;margin-top:9px;padding:8px;border-radius:5px;border:1px solid #65777c;background:#fff;color:#122029;font:12px Arial}#listingking-panel .lk-template-form{margin-top:10px;padding:10px;background:#243941;border-radius:7px}#listingking-panel .lk-template-form label{display:block;font-size:10px;font-weight:700;margin:0 0 7px}#listingking-panel .lk-template-form input{display:block;width:100%;box-sizing:border-box;margin-top:4px;border:1px solid #66767c;border-radius:5px;padding:7px;background:#fff;color:#122029;font:12px Arial,sans-serif}#listingking-panel .lk-template-form .save-template{width:100%;margin:7px 0 0;background:#d8f24f;color:#122029}</style><header><span><span class="mark">◆</span> ListingKing</span><small>v0.1.34 · Meesho only</small></header><section class="lk-smart"><strong>Smart listing</strong><small class="lk-listing-summary">Loading your Ready listings…</small><select class="lk-listing-select" aria-label="Ready Smart Listing" disabled><option>Loading…</option></select><button class="fill" data-action="fill">Fill product 1</button></section><button class="plain" data-action="capture">Capture template</button><button class="plain" data-action="dry">Check page fields</button><button class="plain" data-action="refresh">Reload listings</button><button class="stop" data-action="stop">Stop filling</button><form class="lk-template-form" hidden><label>Template name<input name="templateName" maxlength="100" placeholder="Example: Japanese balm - free size" required></label><label>Meesho category<input name="categoryLabel" maxlength="100" placeholder="Example: Pain relief balm" required></label><button class="save-template" type="submit">Save this template</button></form><span class="lk-status">Connect the extension, then select a Ready listing.</span>`;
+  panel.innerHTML = `<style>#listingking-panel{position:fixed;right:20px;bottom:22px;z-index:2147483647;width:322px;background:#122029;color:#fff;border-radius:12px;box-shadow:0 16px 50px #0005;padding:15px;font:12px Arial,sans-serif;transition:box-shadow .2s}#listingking-panel.lk-dragging{box-shadow:0 20px 60px #0008;opacity:.92}#listingking-panel header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:14px;font-weight:700;cursor:grab;user-select:none;-webkit-user-select:none}#listingking-panel header:active{cursor:grabbing}#listingking-panel .lk-toggle{background:none;border:none;color:#8aa;font-size:16px;cursor:pointer;padding:0 2px;width:auto;margin:0;line-height:1}#listingking-panel .mark{color:#d8f24f}#listingking-panel button{border:0;border-radius:6px;padding:9px 7px;font-weight:700;cursor:pointer;margin:3px;width:calc(50% - 8px)}#listingking-panel .fill{width:calc(100% - 6px);background:#d8f24f;color:#122029;margin-top:9px}#listingking-panel .plain{background:#243941;color:#fff}#listingking-panel .stop{width:calc(100% - 6px);background:#f17b58;color:#fff}#listingking-panel .lk-status{display:block;background:#fff;color:#34745b;border-radius:5px;padding:8px;margin-top:8px;line-height:1.35}#listingking-panel .lk-smart{background:#1b3038;border:1px solid #38515a;border-radius:8px;padding:10px}#listingking-panel .lk-smart strong,#listingking-panel .lk-smart small{display:block}#listingking-panel .lk-smart small{color:#b7c5c8;margin-top:3px;line-height:1.3}#listingking-panel .lk-smart select{width:100%;box-sizing:border-box;margin-top:9px;padding:8px;border-radius:5px;border:1px solid #65777c;background:#fff;color:#122029;font:12px Arial}#listingking-panel .lk-template-form{margin-top:10px;padding:10px;background:#243941;border-radius:7px}#listingking-panel .lk-template-form label{display:block;font-size:10px;font-weight:700;margin:0 0 7px}#listingking-panel .lk-template-form input{display:block;width:100%;box-sizing:border-box;margin-top:4px;border:1px solid #66767c;border-radius:5px;padding:7px;background:#fff;color:#122029;font:12px Arial,sans-serif}#listingking-panel .lk-template-form .save-template{width:100%;margin:7px 0 0;background:#d8f24f;color:#122029}#listingking-panel .lk-body{overflow:hidden;transition:max-height .25s ease,opacity .2s ease}#listingking-panel .lk-body.lk-collapsed{max-height:0!important;opacity:0;pointer-events:none}#listingking-panel.lk-minimized{width:auto;padding:10px 14px;border-radius:10px}</style><header><span><span class="mark">◆</span> ListingKing</span><span style="display:flex;align-items:center;gap:6px"><small>v0.1.34 · Meesho only</small><button type="button" class="lk-toggle" title="Minimize / Expand">▾</button></span></header><div class="lk-body"><section class="lk-smart"><strong>Smart listing</strong><small class="lk-listing-summary">Loading your Ready listings…</small><select class="lk-listing-select" aria-label="Ready Smart Listing" disabled><option>Loading…</option></select><button class="fill" data-action="fill">Fill product 1</button></section><button class="plain" data-action="capture">Capture template</button><button class="plain" data-action="dry">Check page fields</button><button class="plain" data-action="refresh">Reload listings</button><button class="stop" data-action="stop">Stop filling</button><form class="lk-template-form" hidden><label>Template name<input name="templateName" maxlength="100" placeholder="Example: Japanese balm - free size" required></label><label>Meesho category<input name="categoryLabel" maxlength="100" placeholder="Example: Pain relief balm" required></label><button class="save-template" type="submit">Save this template</button></form><span class="lk-status">Connect the extension, then select a Ready listing.</span></div>`;
+
+  // --- Dragging logic ---
+  {
+    const header = panel.querySelector("header");
+    const body = panel.querySelector(".lk-body");
+    const toggleBtn = panel.querySelector(".lk-toggle");
+    let dragging = false, startX = 0, startY = 0, panelX = 0, panelY = 0;
+
+    // Restore saved position
+    chrome.storage.local.get(["lkPanelPos", "lkPanelMinimized"], stored => {
+      if (stored.lkPanelPos) {
+        const { x, y } = stored.lkPanelPos;
+        panel.style.right = "auto";
+        panel.style.bottom = "auto";
+        panel.style.left = Math.min(x, window.innerWidth - 60) + "px";
+        panel.style.top = Math.min(y, window.innerHeight - 40) + "px";
+      }
+      if (stored.lkPanelMinimized) {
+        body.classList.add("lk-collapsed");
+        panel.classList.add("lk-minimized");
+        toggleBtn.textContent = "▸";
+      }
+    });
+
+    header.addEventListener("pointerdown", e => {
+      // Don't drag when clicking the toggle button
+      if (e.target.closest(".lk-toggle")) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = panel.getBoundingClientRect();
+      panelX = rect.left;
+      panelY = rect.top;
+      panel.classList.add("lk-dragging");
+      header.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    header.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const x = panelX + (e.clientX - startX);
+      const y = panelY + (e.clientY - startY);
+      const clampedX = Math.max(0, Math.min(x, window.innerWidth - 60));
+      const clampedY = Math.max(0, Math.min(y, window.innerHeight - 40));
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+      panel.style.left = clampedX + "px";
+      panel.style.top = clampedY + "px";
+    });
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      panel.classList.remove("lk-dragging");
+      const rect = panel.getBoundingClientRect();
+      chrome.storage.local.set({ lkPanelPos: { x: rect.left, y: rect.top } });
+    };
+    header.addEventListener("pointerup", endDrag);
+    header.addEventListener("pointercancel", endDrag);
+
+    // --- Minimize / Expand toggle ---
+    toggleBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      const collapsed = body.classList.toggle("lk-collapsed");
+      panel.classList.toggle("lk-minimized", collapsed);
+      toggleBtn.textContent = collapsed ? "▸" : "▾";
+      chrome.storage.local.set({ lkPanelMinimized: collapsed });
+    });
+  }
   panel.addEventListener("click", event => {
     const action = event.target.dataset.action;
     if (action === "capture") showTemplateForm();
