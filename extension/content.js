@@ -109,6 +109,9 @@
     if (/wrong|defective|return\s*price/.test(key)) return item.defectivePrice;
     if (/colour|color/.test(key)) return details.color;
     if (/material|fabric/.test(key)) return details.material;
+    // "Style code / Product ID" should receive the SKU, not the style attribute.
+    // This must be checked before the generic style|pattern|fit match below.
+    if (/style\s*code|product\s*id/.test(key)) return item.sku;
     if (/style|pattern|fit/.test(key)) return details.style;
     if (/audience|gender/.test(key)) return details.audience;
     return field.defaultValue;
@@ -621,6 +624,24 @@
     }
     return { count };
   };
+  // Meesho's "Style code / Product ID" is a plain text input in the upper form,
+  // separate from the price-table SKU column. It must receive the same SKU value
+  // so sellers have a consistent identifier across both fields. Rather than
+  // relying on the captured template (which might predate this field or belong
+  // to a different category), we search the live DOM for any visible input whose
+  // placeholder or label text matches "style code" or "product id".
+  const fillStyleCodeField = item => {
+    if (!item.sku) return 0;
+    const inputs = [...document.querySelectorAll("input[type='text'], input:not([type])")].filter(el => visible(el));
+    for (const input of inputs) {
+      const hint = `${input.placeholder || ""} ${labelFor(input)}`.toLowerCase();
+      if (/style\s*code|product\s*id/.test(hint) && !/product\s*name/.test(hint)) {
+        nativeSet(input, String(item.sku));
+        return 1;
+      }
+    }
+    return 0;
+  };
   const fileFromStoredImage = (result, image, index) => {
     if (typeof result?.base64 !== "string" || !result.base64) throw new Error("ListingKing received no image data from storage.");
     let binary;
@@ -732,6 +753,7 @@
       results.push({ field: entry.label, status: "filled" });
     }
     const priceResult = stopped ? { count: 0 } : await fillPriceAndSkuRow(item);
+    const styleCodeCount = stopped ? 0 : fillStyleCodeField(item);
     const images = stopped ? { attached: 0, skipped: 0 } : await attachStoredImages(item);
     chrome.runtime.sendMessage({ type: "LK_AUDIT", payload: { status: stopped ? "PARTIAL" : "SUCCESS", fields: results.map(result => ({ ...result, value: undefined })) } });
     const imageStatus = images.message ? ` ${images.message}` : images.attached ? ` ${images.attached} stored image${images.attached === 1 ? "" : "s"} attached.` : "";
@@ -739,7 +761,7 @@
     renderReadyListings();
     const selectionStatus = results.filter(result => result.status === "needs_selection").map(result => result.field);
     const extraStatus = [priceResult.message, lastSizeFailure, selectionStatus.length ? `Choose ${selectionStatus.join(", ")} manually, then retry.` : ""].filter(Boolean).join(" ");
-    toast(stopped ? "Stopped by seller. Existing changes remain visible for review." : `Fill finished: ${results.filter(result => result.status === "filled").length + priceResult.count} fields updated.${imageStatus}${extraStatus ? ` ${extraStatus}` : ""} Review before submitting.`);
+    toast(stopped ? "Stopped by seller. Existing changes remain visible for review." : `Fill finished: ${results.filter(result => result.status === "filled").length + priceResult.count + styleCodeCount} fields updated.${imageStatus}${extraStatus ? ` ${extraStatus}` : ""} Review before submitting.`);
   };
 
   const panel = document.createElement("section");
